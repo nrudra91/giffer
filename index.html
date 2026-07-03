@@ -191,6 +191,22 @@
   .crop-h.sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
   .crop-h.se { right: -8px; bottom: -8px; cursor: nwse-resize; }
   .crop-dims { position: absolute; top: -24px; left: 0; background: var(--accent-2); color: #05231a; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; line-height: 1.4; }
+  .stage-inner { position: relative; line-height: 0; transform-origin: 0 0; transition: transform .4s cubic-bezier(.22,.61,.36,1); }
+  .mode-row { display: flex; gap: 8px; }
+  .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .camera-rec-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  #pathRecBtn.recording { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .crop-rect.camera { border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,.5); }
+  .out-preview-wrap { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #outPreview {
+    background:
+      linear-gradient(45deg,#20242e 25%,transparent 25%),
+      linear-gradient(-45deg,#20242e 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#20242e 75%),
+      linear-gradient(-45deg,transparent 75%,#20242e 75%);
+    background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0;
+    border: 1px solid var(--border); border-radius: 8px; max-width: 320px; max-height: 200px;
+  }
   .review-tools { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 720px; }
   .preset-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .preset-row .btn { padding: 5px 11px; font-size: 12px; }
@@ -204,6 +220,7 @@
   <h1>Giffer</h1>
   <span class="sub">GIF Caption Studio</span>
   <span class="spacer"></span>
+  <button class="btn" id="backToReviewBtn" style="display:none">↩ Adjust recording</button>
   <button class="btn" id="newBtn" style="display:none">↺ New GIF</button>
 </header>
 
@@ -292,24 +309,50 @@
     <div class="review-wrap" id="reviewWrap">
       <div class="section-title" style="align-self:flex-start">Crop &amp; trim your recording</div>
       <div class="review-stage">
-        <canvas id="reviewCanvas"></canvas>
-        <div class="crop-overlay" id="cropOverlay">
-          <div class="crop-rect" id="cropRect">
-            <div class="crop-dims" id="cropDims"></div>
-            <div class="crop-h nw" data-c="nw"></div>
-            <div class="crop-h ne" data-c="ne"></div>
-            <div class="crop-h sw" data-c="sw"></div>
-            <div class="crop-h se" data-c="se"></div>
+        <div class="stage-inner" id="stageInner">
+          <canvas id="reviewCanvas"></canvas>
+          <div class="crop-overlay" id="cropOverlay">
+            <div class="crop-rect" id="cropRect">
+              <div class="crop-dims" id="cropDims"></div>
+              <div class="crop-h nw" data-c="nw"></div>
+              <div class="crop-h ne" data-c="ne"></div>
+              <div class="crop-h sw" data-c="sw"></div>
+              <div class="crop-h se" data-c="se"></div>
+            </div>
           </div>
         </div>
       </div>
       <div class="review-tools">
-        <div class="preset-row">
-          <span class="swatch-lbl" style="flex:none">Crop shape:</span>
-          <button class="btn" data-preset="full">Full frame</button>
-          <button class="btn" data-preset="1">1:1</button>
-          <button class="btn" data-preset="1.777">16:9</button>
-          <button class="btn" data-preset="1.333">4:3</button>
+        <div class="mode-row">
+          <button class="btn mode-btn active" data-mode="static">✂ Static crop</button>
+          <button class="btn mode-btn" data-mode="camera">🎥 Moving window</button>
+        </div>
+        <div id="staticControls">
+          <div class="preset-row">
+            <span class="swatch-lbl" style="flex:none">Crop shape:</span>
+            <button class="btn" data-preset="full">Full frame</button>
+            <button class="btn" data-preset="1">1:1</button>
+            <button class="btn" data-preset="1.777">16:9</button>
+            <button class="btn" data-preset="1.333">4:3</button>
+            <button class="btn" id="resetCropBtn" style="margin-left:auto" title="Back to the full screen to start over">⟲ Reset &amp; redraw</button>
+          </div>
+        </div>
+        <div id="cameraControls" style="display:none">
+          <div class="preset-row">
+            <span class="swatch-lbl" style="flex:none">Window aspect:</span>
+            <button class="btn" data-aspect="1.777">16:9</button>
+            <button class="btn" data-aspect="1">1:1</button>
+            <button class="btn" data-aspect="1.333">4:3</button>
+            <button class="btn" data-aspect="0.5625">9:16</button>
+          </div>
+          <div class="camera-rec-row">
+            <button class="btn accent" id="pathRecBtn">● Record camera path</button>
+            <span class="meta" id="pathStatus">Position the window, then record its motion while the clip plays.</span>
+          </div>
+          <div class="out-preview-wrap" id="outPreviewWrap">
+            <span class="swatch-lbl" style="flex:none">GIF output preview:</span>
+            <canvas id="outPreview"></canvas>
+          </div>
         </div>
         <div class="transport">
           <button class="play" id="rvPlay" title="Play / Pause">▶</button>
@@ -391,7 +434,7 @@ const canvasWrap = $('#canvasWrap'), view = $('#view'), vctx = view.getContext('
 const playBtn = $('#playBtn'), scrub = $('#scrub'), timeLbl = $('#timeLbl');
 const timeline = $('#timeline'), gifMeta = $('#gifMeta');
 const addCap = $('#addCap'), capList = $('#capList');
-const renderBtn = $('#renderBtn'), newBtn = $('#newBtn');
+const renderBtn = $('#renderBtn'), newBtn = $('#newBtn'), backToReviewBtn = $('#backToReviewBtn');
 const toast = $('#toast');
 
 // ---------- Toast ----------
@@ -434,6 +477,8 @@ function enterEditor(metaText){
   reviewWrap.style.display = 'none';
   canvasWrap.style.display = 'flex';
   newBtn.style.display = 'inline-block';
+  // Recordings retain their source footage, so offer a way back to re-crop / re-adjust the window.
+  backToReviewBtn.style.display = rv.frames.length ? 'inline-block' : 'none';
   addCap.disabled = false; renderBtn.disabled = false;
   gifMeta.textContent = metaText;
 }
@@ -1023,7 +1068,8 @@ const cropOverlay = $('#cropOverlay'), cropRect = $('#cropRect'), cropDims = $('
 
 const rv = { frames: [], starts: [], duration: 0, W: 0, H: 0,
              crop: { x: 0, y: 0, w: 1, h: 1 }, inMs: 0, outMs: 0,
-             playing: false, raf: null, pStart: 0, pOff: 0 };
+             playing: false, raf: null, pStart: 0, pOff: 0,
+             mode: 'static', aspect: 16/9, path: [], recordingPath: false };
 
 function enterReview(){
   rv.frames = rec.frames; rv.W = rec.capW; rv.H = rec.capH;
@@ -1038,7 +1084,11 @@ function enterReview(){
   trimIn.max = trimOut.max = String(rv.duration);
   trimIn.value = '0'; trimOut.value = String(rv.duration);
   rvPlay.textContent = '▶';
+  rv.recordingPath = false; rv.path = []; if (!rv.aspect) rv.aspect = 16/9;
+  state.captions = [];   // fresh recording starts with no captions
+  backToReviewBtn.style.display = 'none';
   layoutCrop(); rvDrawAt(0); updateTrimLabels();
+  setMode('static');
   showScreen('review');
 }
 
@@ -1057,8 +1107,17 @@ function rvDrawAt(ms){
 function rvLoop(now){
   if (!rv.playing) return;
   let e = now - rv.pStart + rv.pOff;
-  if (e >= rv.outMs){ e = rv.inMs; rv.pStart = now; rv.pOff = rv.inMs; }   // loop within the trim window
+  if (e >= rv.outMs){
+    if (rv.recordingPath){ stopPathRec(); return; }   // finish the camera path at the trim-out point
+    e = rv.inMs; rv.pStart = now; rv.pOff = rv.inMs;    // otherwise loop within the trim window
+  }
+  if (rv.recordingPath){
+    rv.path.push({ t: e, x: rv.crop.x, y: rv.crop.y, w: rv.crop.w, h: rv.crop.h });
+  } else if (rv.mode === 'camera' && rv.path.length){
+    const win = interpPath(e); rv.crop.x = win.x; rv.crop.y = win.y; rv.crop.w = win.w; rv.crop.h = win.h; layoutCrop();
+  }
   rvDrawAt(e);
+  if (rv.mode === 'camera') drawOutPreview();
   rv.raf = requestAnimationFrame(rvLoop);
 }
 function rvPlayToggle(){
@@ -1070,7 +1129,15 @@ function rvPlayToggle(){
   }
 }
 rvPlay.addEventListener('click', rvPlayToggle);
-rvScrub.addEventListener('input', () => { if (rv.playing) rvPlayToggle(); rvDrawAt(Number(rvScrub.value)); });
+rvScrub.addEventListener('input', () => {
+  if (rv.playing) rvPlayToggle();
+  const ms = Number(rvScrub.value);
+  if (rv.mode === 'camera' && rv.path.length && !rv.recordingPath){
+    const w = interpPath(ms); rv.crop.x = w.x; rv.crop.y = w.y; rv.crop.w = w.w; rv.crop.h = w.h; layoutCrop();
+  }
+  rvDrawAt(ms);
+  if (rv.mode === 'camera') drawOutPreview();
+});
 
 function updateTrimLabels(){
   rv.inMs = Number(trimIn.value); rv.outMs = Number(trimOut.value);
@@ -1104,10 +1171,152 @@ function setPreset(ratio){
   layoutCrop();
 }
 reviewWrap.querySelectorAll('[data-preset]').forEach(b =>
-  b.addEventListener('click', () => { const v = b.dataset.preset; setPreset(v === 'full' ? 'full' : Number(v)); }));
+  b.addEventListener('click', () => { const v = b.dataset.preset; setPreset(v === 'full' ? 'full' : Number(v)); scheduleFocus(); }));
+// Reset to the full screen and stay there, so you can redraw a fresh crop from scratch.
+$('#resetCropBtn').addEventListener('click', () => {
+  rv.crop = { x: 0, y: 0, w: 1, h: 1 };
+  layoutCrop(); clearTimeout(focusTimer); unfocusView();
+});
 
-// Shared crop-rectangle dragging (used by the review crop and the live recording guide).
-function attachCropDrag(overlay, rectEl, ref, onChange){
+// ---------- Feature: focus-zoom on the crop while adjusting (static mode) ----------
+const stageInner = $('#stageInner');
+let focusTimer = null;
+function unfocusView(instant){ stageInner.style.transition = instant ? 'none' : ''; stageInner.style.transform = 'none'; }
+function focusOnCrop(){
+  if (rv.mode !== 'static') return;
+  const { x, y, w, h } = rv.crop;
+  if (w >= 0.999 && h >= 0.999){ unfocusView(); return; }
+  const s = Math.min(Math.min(1/w, 1/h) * 0.9, 8);   // fit the crop into view, capped
+  const cx = x + w/2, cy = y + h/2;
+  stageInner.style.transition = '';
+  stageInner.style.transform = `translate(${(0.5 - s*cx)*100}%, ${(0.5 - s*cy)*100}%) scale(${s})`;
+}
+function scheduleFocus(delay){ if (rv.mode !== 'static') return; clearTimeout(focusTimer); focusTimer = setTimeout(focusOnCrop, delay == null ? 500 : delay); }
+function onDragStart(mode){ if (rv.mode !== 'static') return; clearTimeout(focusTimer); if (mode === 'move') unfocusView(true); }
+function onDragEnd(){ if (rv.mode === 'static') scheduleFocus(); }
+
+// ---------- Feature: moving window (virtual camera, live drag-to-record) ----------
+const modeBtns = [...reviewWrap.querySelectorAll('.mode-btn')];
+const staticControls = $('#staticControls'), cameraControls = $('#cameraControls');
+const outPreview = $('#outPreview'), opCtx = outPreview.getContext('2d');
+const pathRecBtn = $('#pathRecBtn'), pathStatus = $('#pathStatus');
+
+function onCropChange(){ layoutCrop(); if (rv.mode === 'camera') drawOutPreview(); }
+
+function drawOutPreview(){
+  if (rv.mode !== 'camera') return;
+  const c = rv.crop;
+  const sx = c.x*rv.W, sy = c.y*rv.H, sw = Math.max(1, c.w*rv.W), sh = Math.max(1, c.h*rv.H);
+  const ar = sw/sh; let ow = 320, oh = 320/ar; if (oh > 200){ oh = 200; ow = 200*ar; }
+  outPreview.width = Math.round(ow); outPreview.height = Math.round(oh);
+  opCtx.clearRect(0, 0, outPreview.width, outPreview.height);
+  opCtx.drawImage(reviewCanvas, sx, sy, sw, sh, 0, 0, outPreview.width, outPreview.height);
+}
+
+function applyAspect(aspect){
+  rv.aspect = aspect;
+  const k = (rv.W/rv.H) / aspect;   // h = w*k (normalized units)
+  const cx = rv.crop.x + rv.crop.w/2, cy = rv.crop.y + rv.crop.h/2;
+  let w = Math.min(rv.crop.w, 0.9); let h = w*k;
+  if (h > 0.9){ h = 0.9; w = h/k; }
+  rv.crop.w = w; rv.crop.h = h;
+  rv.crop.x = Math.max(0, Math.min(cx - w/2, 1 - w));
+  rv.crop.y = Math.max(0, Math.min(cy - h/2, 1 - h));
+  onCropChange();
+}
+
+function interpPath(ms){
+  const p = rv.path;
+  if (!p.length) return { x: rv.crop.x, y: rv.crop.y, w: rv.crop.w, h: rv.crop.h };
+  if (ms <= p[0].t) return p[0];
+  if (ms >= p[p.length-1].t) return p[p.length-1];
+  let lo = 0, hi = p.length - 1;
+  while (lo + 1 < hi){ const mid = (lo + hi) >> 1; if (p[mid].t <= ms) lo = mid; else hi = mid; }
+  const a = p[lo], b = p[hi], f = (ms - a.t) / ((b.t - a.t) || 1);
+  return { x: a.x+(b.x-a.x)*f, y: a.y+(b.y-a.y)*f, w: a.w+(b.w-a.w)*f, h: a.h+(b.h-a.h)*f };
+}
+
+function syncModeUI(m){
+  modeBtns.forEach(x => x.classList.toggle('active', x.dataset.mode === m));
+  staticControls.style.display = m === 'static' ? 'block' : 'none';
+  cameraControls.style.display = m === 'camera' ? 'block' : 'none';
+  cropRect.classList.toggle('camera', m === 'camera');
+}
+// User-driven mode switch — resets the path and re-initialises the window for that mode.
+function setMode(m){
+  rv.mode = m;
+  rv.recordingPath = false; rv.path = [];
+  pathRecBtn.classList.remove('recording'); pathRecBtn.textContent = '● Record camera path';
+  syncModeUI(m);
+  if (m === 'camera'){
+    clearTimeout(focusTimer); unfocusView();
+    if (!rv.aspect) rv.aspect = 16/9;
+    applyAspect(rv.aspect);
+    pathStatus.textContent = 'Position the window, then record its motion while the clip plays.';
+    drawOutPreview();
+  } else {
+    unfocusView(true); onCropChange(); scheduleFocus();
+  }
+  rvDrawAt(Number(rvScrub.value));
+}
+// Go back from the editor to re-adjust — preserves the current mode, crop, and recorded path.
+function reopenReview(){
+  if (!rv.frames.length) return;
+  pause();   // stop editor playback
+  backToReviewBtn.style.display = 'none';
+  reviewCanvas.width = rv.W; reviewCanvas.height = rv.H;
+  rvScrub.max = String(rv.duration); rvScrub.value = String(rv.inMs);
+  trimIn.max = trimOut.max = String(rv.duration);
+  trimIn.value = String(rv.inMs); trimOut.value = String(rv.outMs);
+  updateTrimLabels();
+  rvPlay.textContent = '▶'; rv.recordingPath = false;
+  pathRecBtn.classList.remove('recording');
+  syncModeUI(rv.mode);
+  if (rv.mode === 'camera'){
+    unfocusView();
+    pathRecBtn.textContent = rv.path.length ? '● Re-record path' : '● Record camera path';
+    pathStatus.textContent = rv.path.length ? `Path recorded · ${rv.path.length} samples · press ▶ to preview.` : 'Position the window, then record its motion while the clip plays.';
+    if (rv.path.length){ const s = interpPath(rv.inMs); rv.crop.x = s.x; rv.crop.y = s.y; rv.crop.w = s.w; rv.crop.h = s.h; }
+    layoutCrop(); rvDrawAt(rv.inMs); drawOutPreview();
+  } else {
+    layoutCrop(); rvDrawAt(rv.inMs); scheduleFocus();
+  }
+  showScreen('review');
+}
+backToReviewBtn.addEventListener('click', reopenReview);
+modeBtns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+cameraControls.querySelectorAll('[data-aspect]').forEach(b => b.addEventListener('click', () => applyAspect(Number(b.dataset.aspect))));
+
+function startPlayFrom(ms){
+  if (rv.playing) cancelAnimationFrame(rv.raf);
+  rv.playing = true; rvPlay.textContent = '⏸';
+  rv.pOff = ms; rv.pStart = performance.now();
+  rv.raf = requestAnimationFrame(rvLoop);
+}
+function stopPathRec(){
+  rv.recordingPath = false;
+  pathRecBtn.classList.remove('recording'); pathRecBtn.textContent = '● Re-record path';
+  if (rv.playing){ rv.playing = false; cancelAnimationFrame(rv.raf); rvPlay.textContent = '▶'; }
+  if (rv.path.length){
+    pathStatus.textContent = `Path recorded · ${rv.path.length} samples · press ▶ to preview.`;
+    const s = interpPath(rv.inMs); rv.crop.x = s.x; rv.crop.y = s.y; rv.crop.w = s.w; rv.crop.h = s.h;
+    onCropChange(); rvDrawAt(rv.inMs);
+  } else {
+    pathStatus.textContent = 'No motion captured — try again.';
+  }
+}
+pathRecBtn.addEventListener('click', () => {
+  if (rv.recordingPath){ stopPathRec(); return; }
+  rv.path = []; rv.recordingPath = true;
+  pathRecBtn.classList.add('recording'); pathRecBtn.textContent = '■ Stop path';
+  pathStatus.textContent = 'Recording motion… drag / resize the window to follow the action.';
+  rvScrub.value = String(rv.inMs);
+  startPlayFrom(rv.inMs);
+});
+
+// Shared crop-rectangle dragging (used by the review crop, the camera window, and the live recording guide).
+function attachCropDrag(overlay, rectEl, ref, opts){
+  opts = opts || {};
   let drag = null;
   const pt = e => { const r = overlay.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; };
   rectEl.addEventListener('pointerdown', e => {
@@ -1115,20 +1324,36 @@ function attachCropDrag(overlay, rectEl, ref, onChange){
     e.preventDefault();
     const p = pt(e);
     drag = { mode: 'move', sx: p.x, sy: p.y, orig: { ...ref.crop } };
+    if (opts.onStart) opts.onStart('move');
     overlay.setPointerCapture(e.pointerId);
   });
   rectEl.querySelectorAll('.crop-h').forEach(h => h.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
     const p = pt(e);
     drag = { mode: 'resize', corner: h.dataset.c, sx: p.x, sy: p.y, orig: { ...ref.crop } };
+    if (opts.onStart) opts.onStart('resize');
     overlay.setPointerCapture(e.pointerId);
   }));
   overlay.addEventListener('pointermove', e => {
     if (!drag) return;
     const p = pt(e), o = drag.orig, dx = p.x - drag.sx, dy = p.y - drag.sy;
+    const aspect = opts.aspect && opts.aspect();
     if (drag.mode === 'move'){
       ref.crop.x = Math.max(0, Math.min(o.x + dx, 1 - o.w));
       ref.crop.y = Math.max(0, Math.min(o.y + dy, 1 - o.h));
+    } else if (aspect){
+      // Aspect-locked resize: anchor the opposite corner, size from the dragged corner.
+      const k = (rv.W/rv.H) / aspect;   // h = w*k
+      const c = drag.corner;
+      const ax = c.includes('w') ? o.x + o.w : o.x;
+      const ay = c.includes('n') ? o.y + o.h : o.y;
+      const availW = c.includes('w') ? ax : (1 - ax);
+      const availH = c.includes('n') ? ay : (1 - ay);
+      let w = Math.max(0.05, Math.min(Math.abs(p.x - ax), availW, availH / k));
+      const h = w * k;
+      ref.crop.x = c.includes('w') ? ax - w : ax;
+      ref.crop.y = c.includes('n') ? ay - h : ay;
+      ref.crop.w = w; ref.crop.h = h;
     } else {
       const c = drag.corner;
       if (c.includes('w')){ const nx = Math.max(0, Math.min(o.x + dx, o.x + o.w - 0.05)); ref.crop.x = nx; ref.crop.w = o.x + o.w - nx; }
@@ -1136,11 +1361,14 @@ function attachCropDrag(overlay, rectEl, ref, onChange){
       if (c.includes('n')){ const ny = Math.max(0, Math.min(o.y + dy, o.y + o.h - 0.05)); ref.crop.y = ny; ref.crop.h = o.y + o.h - ny; }
       if (c.includes('s')){ ref.crop.h = Math.max(0.05, Math.min(o.h + dy, 1 - o.y)); }
     }
-    onChange();
+    if (opts.onChange) opts.onChange();
   });
-  overlay.addEventListener('pointerup', () => { drag = null; });
+  overlay.addEventListener('pointerup', () => { if (drag && opts.onEnd) opts.onEnd(); drag = null; });
 }
-attachCropDrag(cropOverlay, cropRect, rv, layoutCrop);
+attachCropDrag(cropOverlay, cropRect, rv, {
+  onChange: onCropChange, onStart: onDragStart, onEnd: onDragEnd,
+  aspect: () => rv.mode === 'camera' ? rv.aspect : null
+});
 
 // ---------- Live crop guide (non-destructive: full frame is always recorded) ----------
 const recGuideOn = $('#recGuideOn'), recCropOverlay = $('#recCropOverlay'), recCropRect = $('#recCropRect'), recCropDims = $('#recCropDims');
@@ -1161,38 +1389,57 @@ recGuideOn.addEventListener('change', () => {
   recCropOverlay.style.display = recGuideOn.checked ? 'block' : 'none';
   if (recGuideOn.checked) layoutRecCrop();
 });
-attachCropDrag(recCropOverlay, recCropRect, recGuide, layoutRecCrop);
+attachCropDrag(recCropOverlay, recCropRect, recGuide, { onChange: layoutRecCrop });
 
 $('#reviewRetake').addEventListener('click', () => { rv.frames = []; rec.frames = []; openRecorder(); });
 $('#reviewUse').addEventListener('click', applyRecording);
 
 function applyRecording(){
+  if (rv.recordingPath) stopPathRec();
   if (rv.playing) rvPlayToggle();
-  const sx = Math.round(rv.crop.x * rv.W), sy = Math.round(rv.crop.y * rv.H);
-  const sw = Math.max(1, Math.round(rv.crop.w * rv.W)), sh = Math.max(1, Math.round(rv.crop.h * rv.H));
   const inIdx = rvFrameIndexAt(rv.inMs), outIdx = rvFrameIndexAt(Math.max(rv.inMs, rv.outMs - 1));
-
   const tmp = document.createElement('canvas'); tmp.width = rv.W; tmp.height = rv.H;
   const tctx = tmp.getContext('2d');
-  const dst = document.createElement('canvas'); dst.width = sw; dst.height = sh;
-  const dctx = dst.getContext('2d', { willReadFrequently: true });
 
+  let outW, outH;
   const outFrames = [];
-  for (let i = inIdx; i <= outIdx; i++){
-    tctx.putImageData(rv.frames[i].imageData, 0, 0);
-    dctx.clearRect(0, 0, sw, sh);
-    dctx.drawImage(tmp, sx, sy, sw, sh, 0, 0, sw, sh);
-    outFrames.push({ imageData: dctx.getImageData(0, 0, sw, sh), delay: rv.frames[i].delay || Math.round(1000 / rec.fps) });
+
+  if (rv.mode === 'camera'){
+    // Fixed output = the largest window across the path (so the most zoomed-out moment is 1:1); zoomed-in moments upscale.
+    const pts = rv.path.length ? rv.path : [rv.crop];
+    let maxW = 0; for (const p of pts) maxW = Math.max(maxW, p.w);
+    outW = Math.max(2, Math.round(maxW * rv.W));
+    outH = Math.max(2, Math.round(outW / rv.aspect));
+    const dst = document.createElement('canvas'); dst.width = outW; dst.height = outH;
+    const dctx = dst.getContext('2d', { willReadFrequently: true }); dctx.imageSmoothingEnabled = true;
+    for (let i = inIdx; i <= outIdx; i++){
+      const win = rv.path.length ? interpPath(rv.starts[i]) : rv.crop;
+      tctx.putImageData(rv.frames[i].imageData, 0, 0);
+      dctx.clearRect(0, 0, outW, outH);
+      dctx.drawImage(tmp, win.x*rv.W, win.y*rv.H, Math.max(1, win.w*rv.W), Math.max(1, win.h*rv.H), 0, 0, outW, outH);
+      outFrames.push({ imageData: dctx.getImageData(0, 0, outW, outH), delay: rv.frames[i].delay || Math.round(1000 / rec.fps) });
+    }
+  } else {
+    const sx = Math.round(rv.crop.x * rv.W), sy = Math.round(rv.crop.y * rv.H);
+    outW = Math.max(1, Math.round(rv.crop.w * rv.W)); outH = Math.max(1, Math.round(rv.crop.h * rv.H));
+    const dst = document.createElement('canvas'); dst.width = outW; dst.height = outH;
+    const dctx = dst.getContext('2d', { willReadFrequently: true });
+    for (let i = inIdx; i <= outIdx; i++){
+      tctx.putImageData(rv.frames[i].imageData, 0, 0);
+      dctx.clearRect(0, 0, outW, outH);
+      dctx.drawImage(tmp, sx, sy, outW, outH, 0, 0, outW, outH);
+      outFrames.push({ imageData: dctx.getImageData(0, 0, outW, outH), delay: rv.frames[i].delay || Math.round(1000 / rec.fps) });
+    }
   }
 
-  state.W = sw; state.H = sh; state.frames = outFrames;
+  state.W = outW; state.H = outH; state.frames = outFrames;
   state.starts = []; let t = 0;
   for (const f of outFrames){ state.starts.push(t); t += f.delay; }
-  state.duration = t; state.captions = []; state.origBytes = 0; state.origName = 'recording';
-  rv.frames = []; rec.frames = [];   // free the uncropped footage
+  state.duration = t; state.origBytes = 0; state.origName = 'recording';
+  // Keep rv.frames / rv.path so "Adjust recording" can return here; captions (if any) are preserved.
 
   renderCapList(); renderTimeline();
-  enterEditor(`${sw}×${sh} · ${outFrames.length} frames · ${(t/1000).toFixed(2)}s · recorded`);
+  enterEditor(`${outW}×${outH} · ${outFrames.length} frames · ${(t/1000).toFixed(2)}s · recorded`);
   showToast('Recording ready — add a caption!');
 }
 
