@@ -59,9 +59,12 @@
   header .spacer { flex: 1; }
   .layout {
     display: grid;
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: 1fr 0;
     flex: 1; min-height: 0;
+    transition: grid-template-columns .3s ease;
   }
+  .layout.editor-on { grid-template-columns: 1fr 360px; }
+  .layout:not(.editor-on) .sidebar { visibility: hidden; }
   .stage {
     display: flex; flex-direction: column;
     padding: 18px; gap: 14px; min-width: 0;
@@ -71,7 +74,9 @@
     border-left: 1px solid var(--border);
     background: var(--panel);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 16px;
+    min-width: 0;
   }
   /* Drop zone */
   #dropzone {
@@ -153,12 +158,32 @@
   .cap-head:hover { background: var(--accent-soft); }
   .cap-head .dot { width: 9px; height: 9px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #ff5d8f); flex: none; }
   .cap-head .name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cap-head .dup, .cap-head .del { color: var(--muted); border: none; background: none; cursor: pointer; font-size: 15px; padding: 2px 6px; }
-  .cap-head .dup:hover { color: var(--accent); }
+  .cap-head .more, .cap-head .dup, .cap-head .del { color: var(--muted); border: none; background: none; cursor: pointer; font-size: 15px; padding: 2px 6px; }
+  .cap-head .more { font-size: 17px; line-height: 1; }
+  .cap-head .more:hover, .cap-head .dup:hover { color: var(--accent); }
   .cap-head .del:hover { color: var(--danger); }
-  .cap-body { padding: 10px; display: none; flex-direction: column; gap: 10px; }
+  .cap-card.style-open .cap-head .more { color: var(--accent); }
+  .cap-style { display: none; flex-direction: column; gap: 8px; }
+  .cap-card.style-open .cap-style { display: flex; }
+  .cap-body { padding: 10px; display: none; flex-direction: column; gap: 8px; }
   .cap-card.open .cap-body { display: flex; }
   .cap-card.open .cap-head { border-bottom: 1px solid var(--border); }
+  /* Dual-handle timing slider */
+  .ds { position: relative; height: 26px; touch-action: none; }
+  .ds-track { position: absolute; left: 0; right: 0; top: 11px; height: 5px; border-radius: 3px; background: #efe9f7; }
+  .ds-seg { position: absolute; top: 11px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--accent), #ff5d8f); cursor: grab; }
+  .ds-seg::before { content: ''; position: absolute; inset: -9px 0; }
+  .ds-h { position: absolute; top: 6px; width: 15px; height: 15px; border-radius: 50%; background: #fff; border: 2.5px solid var(--accent); box-shadow: 0 1px 4px rgba(43,36,56,.3); transform: translateX(-50%); cursor: ew-resize; transition: transform .1s; }
+  .ds-h.end { border-color: #ff5d8f; }
+  .ds-h:hover { transform: translateX(-50%) scale(1.15); }
+  /* Floating scrub preview shown while adjusting caption timing */
+  .float-preview { position: fixed; z-index: 60; display: none; flex-direction: column; gap: 6px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 8px; box-shadow: 0 14px 40px rgba(43,36,56,.3); pointer-events: none; }
+  .float-preview.on { display: flex; }
+  .float-preview canvas { display: block; border-radius: 8px; background: #000; }
+  .fp-bar { position: relative; height: 6px; border-radius: 3px; background: #efe9f7; }
+  .fp-seg { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--accent), #ff5d8f); }
+  .fp-ph { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--pop); box-shadow: 0 0 3px rgba(255,176,32,.8); }
+  .fp-time { font-size: 10px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
   .field { display: flex; flex-direction: column; gap: 4px; }
   .field label { font-size: 11px; color: var(--muted); }
   .field textarea, .field input[type=text], .field input[type=number], .field select {
@@ -203,7 +228,8 @@
   .rec-settings select { background: #fff; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 8px; font-size: 13px; font-family: inherit; }
   .rec-actions { display: flex; gap: 10px; align-items: center; width: 100%; max-width: 720px; }
   .rec-live { display: none; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
-  .rec-stagebox { position: relative; max-width: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: 0 12px 34px rgba(43,36,56,.25); background: #000; line-height: 0; }
+  .rec-processing { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; flex: 1; width: 100%; }
+  .rec-stagebox { position: relative; flex: none; max-width: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: 0 12px 34px rgba(43,36,56,.25); background: #000; line-height: 0; }
   #recVideo { display: block; max-width: 100%; max-height: 56vh; }
   .rec-badge { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,.65); color: #fff; padding: 5px 11px; border-radius: 20px; font-size: 12px; font-variant-numeric: tabular-nums; display: none; align-items: center; gap: 7px; line-height: 1; }
   .rec-badge.on { display: flex; }
@@ -213,7 +239,14 @@
   .rec-count.on { display: block; }
   .rec-countdown { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: #fff; text-shadow: 0 6px 24px rgba(0,0,0,.7); background: rgba(0,0,0,.28); }
   .rec-countdown.on { display: flex; }
-  .review-stage { position: relative; line-height: 0; max-width: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: 0 12px 34px rgba(43,36,56,.25); align-self: center; }
+  /* "Preview only" state before recording starts */
+  .rec-standby { position: absolute; inset: 0; display: none; align-items: flex-start; justify-content: center; padding-top: 14px; pointer-events: none; }
+  .rec-standby.on { display: flex; }
+  .rec-standby .pill { background: rgba(20,12,32,.8); border: 1.5px solid var(--pop); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: center; line-height: 1.4; }
+  .rec-standby .pill b { color: var(--pop); }
+  .btn.accent.attn { animation: attn 1.4s infinite; }
+  @keyframes attn { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,110,.55); } 50% { box-shadow: 0 0 0 12px rgba(255,90,110,0); } }
+  .review-stage { position: relative; flex: none; line-height: 0; max-width: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: 0 12px 34px rgba(43,36,56,.25); align-self: center; }
   #reviewCanvas { display: block; max-width: 100%; max-height: 52vh; }
   .crop-overlay { position: absolute; inset: 0; }
   .crop-rect { position: absolute; box-shadow: 0 0 0 9999px rgba(20,12,32,.55); border: 1.5px solid var(--accent-2); cursor: move; box-sizing: border-box; }
@@ -301,6 +334,7 @@
       <div class="rec-config" id="recConfig">
         <h2>🔴 Record your screen</h2>
         <div class="meta">Capture a screen, window, or browser tab. When you're done you'll <b>crop to the exact area</b> and trim the ends — so just record generously and clean it up after. Recorded at <b>full resolution</b>; choose the final file size later under <b>Export</b> (Scale &amp; Colors).</div>
+        <div class="meta">You can freely <b>switch tabs and apps</b> while recording — whatever you chose keeps being captured, and a small <b>floating controller</b> (Chrome / Edge) lets you pause or stop from anywhere. It's not part of the shared tab, and if you share the whole screen you can crop it out afterwards.</div>
         <div class="rec-settings">
           <label>Frame rate
             <select id="recFps"><option value="8">8 fps</option><option value="12" selected>12 fps</option><option value="15">15 fps</option><option value="20">20 fps</option></select>
@@ -334,13 +368,22 @@
           <div class="rec-badge" id="recBadge"><span class="pulse"></span> REC 0.0s</div>
           <div class="rec-count" id="recCount"></div>
           <div class="rec-countdown" id="recCountdown"></div>
+          <div class="rec-standby" id="recStandby"><div class="pill">👀 Preview only — not recording yet. Press <b>● Start recording</b></div></div>
         </div>
         <label class="guide-toggle"><input type="checkbox" id="recGuideOn"> Show crop guide — frame where you'll crop <span class="muted-note">(full screen is still recorded)</span></label>
         <div class="rec-actions">
           <button class="btn accent" id="recToggle">● Start recording</button>
+          <button class="btn" id="recPause" style="display:none">⏸ Pause</button>
           <button class="btn" id="recCancelLive">Cancel</button>
         </div>
-        <div class="meta">Space / Enter = start &amp; stop · Esc = cancel · or click “Stop sharing” in your browser's bar.</div>
+        <div class="meta">Space / Enter = start &amp; stop · P = pause · Esc = cancel · or click “Stop sharing” in your browser's bar.</div>
+      </div>
+
+      <div class="rec-processing" id="recProcessing">
+        <div style="font-size:38px">🎞️</div>
+        <div style="font-size:15px;color:var(--text)">Processing your recording…</div>
+        <div class="bar" style="width:min(320px,80%)"><i id="recProcBar"></i></div>
+        <div class="meta" id="recProcLbl">Extracting frames…</div>
       </div>
     </div>
 
@@ -378,11 +421,12 @@
         </div>
         <div id="cameraControls" style="display:none">
           <div class="preset-row">
-            <span class="swatch-lbl" style="flex:none">Window aspect:</span>
+            <span class="swatch-lbl" style="flex:none">Window shape:</span>
             <button class="btn" data-aspect="1.777">16:9</button>
             <button class="btn" data-aspect="1">1:1</button>
             <button class="btn" data-aspect="1.333">4:3</button>
             <button class="btn" data-aspect="0.5625">9:16</button>
+            <span class="meta">…or drag the corners to draw any size.</span>
           </div>
           <div class="camera-rec-row">
             <button class="btn accent" id="pathRecBtn">● Record camera path</button>
@@ -444,6 +488,12 @@
       </div>
     </div>
   </div>
+</div>
+
+<div class="float-preview" id="floatPreview">
+  <canvas id="fpCanvas"></canvas>
+  <div class="fp-bar"><div class="fp-seg" id="fpSeg"></div><div class="fp-ph" id="fpPh"></div></div>
+  <div class="fp-time" id="fpTime"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -515,6 +565,7 @@ function enterEditor(metaText){
   recordWrap.style.display = 'none';
   reviewWrap.style.display = 'none';
   canvasWrap.style.display = 'flex';
+  document.querySelector('.layout').classList.add('editor-on');
   newBtn.style.display = 'inline-block';
   // Recordings retain their source footage, so offer a way back to re-crop / re-adjust the window.
   backToReviewBtn.style.display = rv.frames.length ? 'inline-block' : 'none';
@@ -639,6 +690,31 @@ function renderCapList(){
 
 function fontOptions(sel){ return FONTS.map(f => `<option value="${f}" ${f===sel?'selected':''} style="font-family:'${f}'">${f}</option>`).join(''); }
 
+// ---------- Floating scrub preview (shown while adjusting caption timing) ----------
+const floatPreview = $('#floatPreview'), fpCanvas = $('#fpCanvas'), fpCtx = fpCanvas.getContext('2d');
+const fpSeg = $('#fpSeg'), fpPh = $('#fpPh'), fpTime = $('#fpTime');
+function showFloatPreview(anchor){
+  const ar = state.H / state.W;
+  let w = 240, h = Math.round(w * ar);
+  if (h > 170){ h = 170; w = Math.round(h / ar); }
+  fpCanvas.width = w; fpCanvas.height = h;
+  floatPreview.classList.add('on');
+  const r = anchor.getBoundingClientRect();
+  const pw = floatPreview.offsetWidth, ph = floatPreview.offsetHeight;
+  const left = Math.max(8, Math.min(r.left + r.width/2 - pw/2, innerWidth - pw - 8));
+  let top = r.top - ph - 12;
+  if (top < 8) top = r.bottom + 12;
+  floatPreview.style.left = left + 'px'; floatPreview.style.top = top + 'px';
+}
+function updateFloatPreview(t, cap){
+  fpCtx.drawImage(view, 0, 0, fpCanvas.width, fpCanvas.height);
+  fpSeg.style.left = (cap.start / state.duration * 100) + '%';
+  fpSeg.style.width = (Math.max(0, cap.end - cap.start) / state.duration * 100) + '%';
+  fpPh.style.left = (t / state.duration * 100) + '%';
+  fpTime.textContent = `${(t/1000).toFixed(2)}s / ${(state.duration/1000).toFixed(2)}s`;
+}
+function hideFloatPreview(){ floatPreview.classList.remove('on'); }
+
 function capCard(cap){
   const el = document.createElement('div');
   el.className = 'cap-card'; el.dataset.id = cap.id;
@@ -646,49 +722,67 @@ function capCard(cap){
     <div class="cap-head">
       <span class="dot"></span>
       <span class="name">${escapeHtml(cap.text) || '(empty)'}</span>
+      <button class="more" title="Style options (font, colors, background…)">⋯</button>
       <button class="dup" title="Duplicate">⧉</button>
       <button class="del" title="Delete">✕</button>
     </div>
     <div class="cap-body">
       <div class="field"><label>Text (use Enter for line breaks)</label><textarea data-k="text">${escapeHtml(cap.text)}</textarea></div>
+      <div class="field">
+        <label>Timing — <span class="ds-lbl"></span></label>
+        <div class="ds">
+          <div class="ds-track"></div>
+          <div class="ds-seg" title="Drag to shift the whole window"></div>
+          <div class="ds-h start" title="When the caption appears"></div>
+          <div class="ds-h end" title="When the caption disappears"></div>
+        </div>
+      </div>
+      <div class="cap-style">
+      <div class="divider" style="margin:2px 0"></div>
       <div class="row2">
         <div class="field"><label>Font</label><select data-k="font">${fontOptions(cap.font)}</select></div>
         <div class="field"><label>Size (${cap.size}px)</label><input type="range" data-k="size" min="8" max="${Math.round(state.H*0.6)}" value="${cap.size}"></div>
       </div>
-      <div class="field"><label>Text color</label><div class="inline"><input type="color" data-k="color" value="${cap.color}"><span class="swatch-lbl">fill</span>
-        <input type="color" data-k="stroke" value="${cap.stroke}"><span class="swatch-lbl">outline</span></div></div>
-      <div class="field"><label>Outline width (${cap.strokeW}px)</label><input type="range" data-k="strokeW" min="0" max="20" value="${cap.strokeW}"></div>
       <div class="row2">
-        <div class="field"><label>Background shape</label><select data-k="bgShape">
+        <div class="field"><label>Text color</label><div class="inline"><input type="color" data-k="color" value="${cap.color}"><span class="swatch-lbl">fill</span>
+          <input type="color" data-k="stroke" value="${cap.stroke}"><span class="swatch-lbl">line</span></div></div>
+        <div class="field"><label>Outline (${cap.strokeW}px)</label><input type="range" data-k="strokeW" min="0" max="20" value="${cap.strokeW}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Background</label><select data-k="bgShape">
           <option value="none" ${cap.bgShape==='none'?'selected':''}>None</option>
           <option value="rect" ${cap.bgShape==='rect'?'selected':''}>Rectangle</option>
           <option value="rounded" ${cap.bgShape==='rounded'?'selected':''}>Rounded box</option>
           <option value="pill" ${cap.bgShape==='pill'?'selected':''}>Pill</option>
         </select></div>
+        <div class="field"><label>Bg fill (${Math.round(cap.bgOpacity*100)}%)</label>
+          <div class="inline"><input type="color" data-k="bgColor" value="${cap.bgColor}">
+          <input type="range" data-k="bgOpacity" min="0" max="1" step="0.05" value="${cap.bgOpacity}"></div></div>
+      </div>
+      <div class="row2">
         <div class="field"><label>Alignment</label><select data-k="align">
           <option value="left" ${cap.align==='left'?'selected':''}>Left</option>
           <option value="center" ${cap.align==='center'?'selected':''}>Center</option>
           <option value="right" ${cap.align==='right'?'selected':''}>Right</option>
         </select></div>
+        <div class="field"><label>Animation</label><select data-k="anim">
+          <option value="none" ${cap.anim==='none'?'selected':''}>None (instant)</option>
+          <option value="fade" ${cap.anim==='fade'?'selected':''}>Fade in / out</option>
+          <option value="slide" ${cap.anim==='slide'?'selected':''}>Slide up + fade</option>
+        </select></div>
       </div>
-      <div class="field"><label>Background color / opacity (${Math.round(cap.bgOpacity*100)}%)</label>
-        <div class="inline"><input type="color" data-k="bgColor" value="${cap.bgColor}">
-        <input type="range" data-k="bgOpacity" min="0" max="1" step="0.05" value="${cap.bgOpacity}"></div></div>
-      <div class="field"><label class="inline" style="gap:6px"><input type="checkbox" data-k="upper" ${cap.upper?'checked':''}> UPPERCASE</label></div>
-      <div class="divider" style="margin:4px 0"></div>
-      <div class="field"><label>Start — <span class="tlbl">${(cap.start/1000).toFixed(2)}s</span></label><input type="range" data-k="start" min="0" max="${state.duration}" step="10" value="${cap.start}"></div>
-      <div class="field"><label>End — <span class="tlbl">${(cap.end/1000).toFixed(2)}s</span></label><input type="range" data-k="end" min="0" max="${state.duration}" step="10" value="${cap.end}"></div>
-      <div class="field"><label>Entrance / exit animation</label><select data-k="anim">
-        <option value="none" ${cap.anim==='none'?'selected':''}>None (instant)</option>
-        <option value="fade" ${cap.anim==='fade'?'selected':''}>Fade in / out</option>
-        <option value="slide" ${cap.anim==='slide'?'selected':''}>Slide up + fade</option>
-      </select></div>
-      <div class="meta">Tip: drag the caption directly on the preview to place it.</div>
+      <label class="inline" style="gap:6px;font-size:12px"><input type="checkbox" data-k="upper" ${cap.upper?'checked':''}> UPPERCASE</label>
+      </div>
+      <div class="meta">Tip: drag the caption directly on the preview to place it. Font, colors &amp; background live under ⋯ above.</div>
     </div>`;
 
   el.querySelector('.cap-head').addEventListener('click', e => {
-    if (e.target.classList.contains('del') || e.target.classList.contains('dup')) return;
+    if (e.target.classList.contains('del') || e.target.classList.contains('dup') || e.target.classList.contains('more')) return;
     el.classList.toggle('open');
+  });
+  el.querySelector('.more').addEventListener('click', () => {
+    el.classList.add('open');
+    el.classList.toggle('style-open');
   });
   el.querySelector('.dup').addEventListener('click', () => duplicateCaption(cap));
   el.querySelector('.del').addEventListener('click', () => {
@@ -702,14 +796,11 @@ function capCard(cap){
       if (inp.type === 'checkbox') v = inp.checked;
       else if (inp.type === 'range' || inp.type === 'number') v = parseFloat(inp.value);
       else v = inp.value;
-      if (k === 'start'){ v = Math.max(0, Math.min(v, cap.end)); inp.value = v; }
-      if (k === 'end'){ v = Math.min(state.duration, Math.max(v, cap.start)); inp.value = v; }
       cap[k] = v;
       // reflect live labels
       if (k === 'size') inp.closest('.field').querySelector('label').textContent = `Size (${Math.round(v)}px)`;
-      if (k === 'strokeW') inp.closest('.field').querySelector('label').textContent = `Outline width (${Math.round(v)}px)`;
-      if (k === 'bgOpacity') inp.closest('.field').querySelector('label').textContent = `Background color / opacity (${Math.round(v*100)}%)`;
-      if (k === 'start' || k === 'end') inp.closest('.field').querySelector('.tlbl').textContent = `${(v/1000).toFixed(2)}s`;
+      if (k === 'strokeW') inp.closest('.field').querySelector('label').textContent = `Outline (${Math.round(v)}px)`;
+      if (k === 'bgOpacity') inp.closest('.field').querySelector('label').textContent = `Bg fill (${Math.round(v*100)}%)`;
       if (k === 'text') el.querySelector('.name').textContent = (v || '(empty)');
       renderTimeline();
       drawAt(Number(scrub.value));
@@ -717,6 +808,60 @@ function capCard(cap){
     inp.addEventListener('input', handler);
     inp.addEventListener('change', handler);
   });
+
+  // Dual-handle timing slider: one segment, left handle = start, right handle = end.
+  // Dragging scrubs the main preview and shows the floating frame preview.
+  const ds = el.querySelector('.ds');
+  const dsSeg = el.querySelector('.ds-seg');
+  const dsHs = el.querySelector('.ds-h.start'), dsHe = el.querySelector('.ds-h.end');
+  const dsLbl = el.querySelector('.ds-lbl');
+  const MIN_SPAN = Math.min(100, state.duration);
+  function dsLayout(){
+    const a = cap.start / state.duration * 100, b = cap.end / state.duration * 100;
+    dsSeg.style.left = a + '%'; dsSeg.style.width = Math.max(0, b - a) + '%';
+    dsHs.style.left = a + '%'; dsHe.style.left = b + '%';
+    dsLbl.textContent = `${(cap.start/1000).toFixed(2)}s → ${(cap.end/1000).toFixed(2)}s`;
+  }
+  dsLayout();
+  const dsT = e => { const r = ds.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * state.duration; };
+  let dsDrag = null;
+  function dsApply(e){
+    if (!dsDrag) return;
+    const t = dsT(e);
+    let previewT;
+    if (dsDrag.mode === 'start'){ cap.start = Math.round(Math.min(Math.max(0, t), cap.end - MIN_SPAN)); previewT = cap.start; }
+    else if (dsDrag.mode === 'end'){ cap.end = Math.round(Math.max(Math.min(state.duration, t), cap.start + MIN_SPAN)); previewT = cap.end; }
+    else {
+      const span = dsDrag.e0 - dsDrag.s0;
+      const ns = Math.max(0, Math.min(dsDrag.s0 + (t - dsDrag.t0), state.duration - span));
+      cap.start = Math.round(ns); cap.end = Math.round(ns + span);
+      previewT = cap.start;
+    }
+    dsLayout(); renderTimeline();
+    drawAt(previewT); playOffset = previewT;
+    updateFloatPreview(previewT, cap);
+  }
+  function dsDown(mode, e){
+    e.preventDefault();
+    dsDrag = { mode, t0: dsT(e), s0: cap.start, e0: cap.end };
+    try { ds.setPointerCapture(e.pointerId); } catch {}
+    pause();
+    showFloatPreview(ds);
+    dsApply(e);
+  }
+  dsHs.addEventListener('pointerdown', e => { e.stopPropagation(); dsDown('start', e); });
+  dsHe.addEventListener('pointerdown', e => { e.stopPropagation(); dsDown('end', e); });
+  dsSeg.addEventListener('pointerdown', e => { e.stopPropagation(); dsDown('seg', e); });
+  ds.addEventListener('pointerdown', e => {
+    // click on the empty track: grab the nearest handle
+    const t = dsT(e);
+    dsDown(Math.abs(t - cap.start) <= Math.abs(t - cap.end) ? 'start' : 'end', e);
+  });
+  ds.addEventListener('pointermove', dsApply);
+  const dsEnd = () => { dsDrag = null; hideFloatPreview(); };
+  ds.addEventListener('pointerup', dsEnd);
+  ds.addEventListener('pointercancel', dsEnd);
+
   return el;
 }
 
@@ -954,8 +1099,19 @@ const capCtx = capCanvas.getContext('2d', { willReadFrequently: true });
 const MAX_REC_FRAMES = 2000;   // hard safety cap so runaway captures can't exhaust memory
 
 let mediaStream = null, recLiveOn = false;
-const rec = { frames: [], grabbing: false, active: false, capW: 0, capH: 0, fps: 12,
-              lastGrab: 0, startPerf: 0, maxDurMs: 0, autoTimer: null, badgeTimer: null, fallback: null };
+const rec = { frames: [], active: false, paused: false, discard: false, finalized: false,
+              capW: 0, capH: 0, fps: 12, activeMs: 0, segStart: 0, maxDurMs: 0, badgeTimer: null };
+let mediaRecorder = null, recChunks = [];
+const recPauseBtn = $('#recPause'), recStandby = $('#recStandby');
+const recProcessing = $('#recProcessing'), recProcBar = $('#recProcBar'), recProcLbl = $('#recProcLbl');
+// Encoding happens in the browser's media pipeline (like Meet/Teams), not on this tab's render
+// loop — so switching tabs or apps mid-recording no longer freezes the capture.
+const recMime = (() => {
+  if (!window.MediaRecorder) return '';
+  for (const m of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'])
+    if (MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+})();
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -964,6 +1120,8 @@ function showScreen(which){
   recordWrap.style.display = which === 'record' ? 'flex' : 'none';
   reviewWrap.style.display = which === 'review' ? 'flex' : 'none';
   canvasWrap.style.display = which === 'editor' ? 'flex' : 'none';
+  // The Export sidebar only matters once there's something to render & save
+  document.querySelector('.layout').classList.toggle('editor-on', which === 'editor');
 }
 
 recordBtn.addEventListener('click', e => { e.stopPropagation(); openRecorder(); });
@@ -972,7 +1130,7 @@ function openRecorder(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
     showToast('Screen recording isn’t supported in this browser.'); return;
   }
-  recConfig.style.display = 'flex'; recLive.style.display = 'none';
+  recConfig.style.display = 'flex'; recLive.style.display = 'none'; recProcessing.style.display = 'none';
   recLiveOn = false;
   showScreen('record');
 }
@@ -1000,10 +1158,12 @@ async function chooseSurface(){
   recConfig.style.display = 'none'; recLive.style.display = 'flex';
   recToggle.textContent = '● Start recording';
   recBadge.classList.remove('on'); recCount.classList.remove('on');
+  recStandby.classList.add('on'); recToggle.classList.add('attn');
   recLiveOn = true;
 }
 
 recToggle.addEventListener('click', () => { rec.active ? stopRecording(true) : startCountdownThenRecord(); });
+recPauseBtn.addEventListener('click', pauseResumeRec);
 $('#recCancelLive').addEventListener('click', cancelRecorder);
 
 function stopStream(){
@@ -1012,21 +1172,30 @@ function stopStream(){
 }
 
 function cancelRecorder(){
-  rec.active = false; rec.grabbing = false; recLiveOn = false;
-  clearTimeout(rec.autoTimer); clearInterval(rec.badgeTimer); clearInterval(rec.fallback);
+  recLiveOn = false;
+  clearInterval(rec.badgeTimer);
   recCountdown.classList.remove('on');
+  recPauseBtn.style.display = 'none';
+  closePip();
+  if (rec.active){
+    rec.active = false; rec.discard = true;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  }
   stopStream();
   showScreen('drop');
 }
 
 async function startCountdownThenRecord(){
+  recStandby.classList.remove('on'); recToggle.classList.remove('attn');
+  await openPipControls();   // needs the click's user gesture, so open before the countdown
   const cd = Number($('#recDelay').value);
   if (cd > 0){
     recCountdown.classList.add('on');
     for (let n = cd; n > 0; n--){
       recCountdown.textContent = n;
+      setPipText(`Starting in ${n}…`, false);
       await sleep(1000);
-      if (!mediaStream) return;   // cancelled mid-countdown
+      if (!mediaStream){ closePip(); return; }   // cancelled mid-countdown
     }
     recCountdown.classList.remove('on');
   }
@@ -1034,70 +1203,179 @@ async function startCountdownThenRecord(){
 }
 
 function beginCapture(){
-  const track = mediaStream.getVideoTracks()[0];
-  const s = track.getSettings();
-  // Capture at full native resolution — no downscaling here. Final size is chosen at export.
-  const srcW = s.width || recVideo.videoWidth, srcH = s.height || recVideo.videoHeight;
-  rec.capW = Math.max(2, Math.round(srcW));
-  rec.capH = Math.max(2, Math.round(srcH));
+  const s = mediaStream.getVideoTracks()[0].getSettings();
+  rec.capW = Math.max(2, Math.round(s.width || recVideo.videoWidth));
+  rec.capH = Math.max(2, Math.round(s.height || recVideo.videoHeight));
   rec.fps = Number($('#recFps').value);
-  rec.frames = []; rec.lastGrab = 0; rec.active = true; rec.grabbing = true;
-  rec.startPerf = performance.now();
+  rec.frames = []; rec.active = true; rec.paused = false; rec.discard = false; rec.finalized = false;
+  rec.activeMs = 0; rec.segStart = performance.now();
   rec.maxDurMs = Number($('#recMaxDur').value) * 1000;
-  capCanvas.width = rec.capW; capCanvas.height = rec.capH;
+  recChunks = [];
+  try {
+    mediaRecorder = new MediaRecorder(mediaStream, recMime ? { mimeType: recMime, videoBitsPerSecond: 12e6 } : { videoBitsPerSecond: 12e6 });
+  } catch (err){
+    showToast('Recording is not supported here: ' + (err && err.message || err));
+    cancelRecorder(); return;
+  }
+  mediaRecorder.addEventListener('dataavailable', e => { if (e.data && e.data.size) recChunks.push(e.data); });
+  mediaRecorder.addEventListener('stop', onRecorderStop);
+  mediaRecorder.start(1000);   // 1s chunks
 
   recToggle.textContent = '■ Stop';
+  recPauseBtn.style.display = 'inline-block'; recPauseBtn.textContent = '⏸ Pause';
   recBadge.classList.add('on'); recCount.classList.add('on');
-  rec.badgeTimer = setInterval(updateRecBadge, 100);
-  if (rec.maxDurMs > 0) rec.autoTimer = setTimeout(() => stopRecording(true), rec.maxDurMs);
-
-  const provisional = Math.round(1000 / rec.fps);
-  const minInterval = provisional - 0.5;
-
-  const grab = tMs => {
-    capCtx.drawImage(recVideo, 0, 0, rec.capW, rec.capH);
-    const imageData = capCtx.getImageData(0, 0, rec.capW, rec.capH);
-    if (rec.frames.length) rec.frames[rec.frames.length - 1].delay = tMs - rec.lastGrab;
-    rec.frames.push({ imageData, delay: provisional });
-    rec.lastGrab = tMs;
-    if (rec.frames.length >= MAX_REC_FRAMES) stopRecording(true);
-  };
-
-  if (recVideo.requestVideoFrameCallback){
-    const onFrame = (now, meta) => {
-      if (!rec.grabbing) return;
-      const tMs = (meta && meta.mediaTime != null) ? meta.mediaTime * 1000 : (performance.now() - rec.startPerf);
-      if (rec.frames.length === 0 || (tMs - rec.lastGrab) >= minInterval) grab(tMs);
-      if (rec.grabbing) recVideo.requestVideoFrameCallback(onFrame);
-    };
-    recVideo.requestVideoFrameCallback(onFrame);
-  } else {
-    // Firefox fallback: no rVFC, so poll on a timer.
-    rec.fallback = setInterval(() => {
-      if (!rec.grabbing){ clearInterval(rec.fallback); return; }
-      grab(performance.now() - rec.startPerf);
-    }, provisional);
-  }
+  rec.badgeTimer = setInterval(recTick, 200);
+  recTick();
 }
 
-function updateRecBadge(){
-  const secs = (performance.now() - rec.startPerf) / 1000;
-  recBadge.innerHTML = `<span class="pulse"></span> REC ${secs.toFixed(1)}s`;
-  const bytes = rec.frames.length * rec.capW * rec.capH * 4;
-  recCount.textContent = `${rec.frames.length} frames · ~${fmtBytes(bytes)} in memory · ${rec.capW}×${rec.capH}`;
+function recActiveMs(){ return rec.activeMs + (rec.paused ? 0 : performance.now() - rec.segStart); }
+
+function recTick(){
+  const secs = recActiveMs() / 1000;
+  recBadge.innerHTML = rec.paused
+    ? `<span class="pulse" style="animation:none;opacity:.45"></span> Paused ${secs.toFixed(1)}s`
+    : `<span class="pulse"></span> REC ${secs.toFixed(1)}s`;
+  const bytes = recChunks.reduce((a, c) => a + c.size, 0);
+  recCount.textContent = `${fmtBytes(bytes)} captured · ${rec.capW}×${rec.capH}`;
+  updatePip();
+  if (rec.maxDurMs > 0 && recActiveMs() >= rec.maxDurMs) stopRecording(true);
+}
+
+function pauseResumeRec(){
+  if (!rec.active || !mediaRecorder) return;
+  if (rec.paused){
+    rec.paused = false; rec.segStart = performance.now();
+    try { mediaRecorder.resume(); } catch {}
+    recPauseBtn.textContent = '⏸ Pause';
+  } else {
+    rec.paused = true; rec.activeMs += performance.now() - rec.segStart;
+    try { mediaRecorder.pause(); } catch {}
+    recPauseBtn.textContent = '▶ Resume';
+  }
+  recTick();
 }
 
 function stopRecording(keep){
   if (!rec.active) return;
-  rec.active = false; rec.grabbing = false; recLiveOn = false;
-  clearTimeout(rec.autoTimer); clearInterval(rec.badgeTimer); clearInterval(rec.fallback);
+  rec.active = false; recLiveOn = false; rec.discard = !keep;
+  clearInterval(rec.badgeTimer);
   recBadge.classList.remove('on'); recCount.classList.remove('on');
+  recPauseBtn.style.display = 'none';
+  closePip();
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();   // fires onRecorderStop
+  else onRecorderStop();
   stopStream();
-  if (!keep || rec.frames.length === 0){ showScreen('drop'); return; }
-  const last = rec.frames[rec.frames.length - 1];
-  if (!last.delay) last.delay = Math.round(1000 / rec.fps);
-  enterReview();
 }
+
+async function onRecorderStop(){
+  if (rec.finalized) return;
+  rec.finalized = true;
+  const type = (mediaRecorder && mediaRecorder.mimeType) || recMime || 'video/webm';
+  const blob = recChunks.length ? new Blob(recChunks, { type }) : null;
+  recChunks = []; mediaRecorder = null;
+  if (rec.discard) return;
+  if (!blob || !blob.size){ showToast('Nothing was recorded.'); showScreen('drop'); return; }
+  try {
+    await decodeRecording(blob);
+    if (!rec.frames.length){ showToast('Nothing was recorded.'); showScreen('drop'); return; }
+    enterReview();
+  } catch (err){
+    console.error(err);
+    showToast('Could not process the recording: ' + (err && err.message || err));
+    showScreen('drop');
+  }
+}
+
+// Turn the recorded video into imageData frames at the chosen fps by seek-stepping through it.
+async function decodeRecording(blob){
+  recConfig.style.display = 'none'; recLive.style.display = 'none';
+  recProcessing.style.display = 'flex';
+  recProcBar.style.width = '0%'; recProcLbl.textContent = 'Preparing…';
+  showScreen('record');
+  const url = URL.createObjectURL(blob);
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+  try {
+    await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error('could not decode the video')); });
+    let dur = v.duration;
+    if (!isFinite(dur) || dur <= 0){
+      // MediaRecorder blobs often report Infinity until forced to build a seek index
+      await seekVideo(v, 1e9, 4000);
+      dur = (isFinite(v.duration) && v.duration > 0) ? v.duration : v.currentTime;
+    }
+    if (!isFinite(dur) || dur <= 0) throw new Error('recording appears to be empty');
+    const W = v.videoWidth || rec.capW, H = v.videoHeight || rec.capH;
+    rec.capW = W; rec.capH = H;
+    capCanvas.width = W; capCanvas.height = H;
+    const delay = Math.round(1000 / rec.fps);
+    const total = Math.min(Math.max(1, Math.round(dur * rec.fps)), MAX_REC_FRAMES);
+    rec.frames = [];
+    for (let i = 0; i < total; i++){
+      await seekVideo(v, Math.min(i / rec.fps, Math.max(0, dur - 0.01)));
+      capCtx.drawImage(v, 0, 0, W, H);
+      rec.frames.push({ imageData: capCtx.getImageData(0, 0, W, H), delay });
+      if (i % 4 === 0 || i === total - 1){
+        recProcBar.style.width = Math.round(((i + 1) / total) * 100) + '%';
+        recProcLbl.textContent = `Extracting frame ${i + 1} / ${total}`;
+      }
+    }
+  } finally {
+    URL.revokeObjectURL(url);
+    recProcessing.style.display = 'none';
+  }
+}
+function seekVideo(v, t, guardMs){
+  return new Promise(res => {
+    if (Math.abs(v.currentTime - t) < 0.001 && v.readyState >= 2){ res(); return; }
+    let done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(guard); v.removeEventListener('seeked', finish); res(); };
+    const guard = setTimeout(finish, guardMs || 1500);   // never hang on a missing 'seeked'
+    v.addEventListener('seeked', finish);
+    v.currentTime = t;
+  });
+}
+
+// ---------- Floating recording controller (Document Picture-in-Picture) ----------
+// Always-on-top mini window (same API Meet uses) so you can pause/stop from any tab or app.
+let pipWin = null;
+async function openPipControls(){
+  if (!('documentPictureInPicture' in window)) return;
+  try { pipWin = await documentPictureInPicture.requestWindow({ width: 280, height: 110 }); }
+  catch { pipWin = null; return; }
+  const d = pipWin.document;
+  d.head.innerHTML = `<style>
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#2b2438; color:#fff;
+           height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; user-select:none; }
+    .st { font-size:14px; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:8px; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#e5484d; animation:pp 1s infinite; }
+    .dot.off { animation:none; opacity:.45; }
+    @keyframes pp { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .row { display:flex; gap:8px; }
+    button { border:none; border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; color:#fff; }
+    #pipPause { background:#4a4160; }
+    #pipStop { background:linear-gradient(135deg,#ff6b4a,#ff4a7d); }
+  </style>`;
+  d.body.innerHTML = `
+    <div class="st"><span class="dot" id="pipDot"></span><span id="pipTxt">Get ready…</span></div>
+    <div class="row"><button id="pipPause">⏸ Pause</button><button id="pipStop">■ Stop &amp; edit</button></div>`;
+  d.getElementById('pipPause').addEventListener('click', () => pauseResumeRec());
+  d.getElementById('pipStop').addEventListener('click', () => { rec.active ? stopRecording(true) : cancelRecorder(); });
+  pipWin.addEventListener('pagehide', () => { pipWin = null; });
+}
+function setPipText(txt, dotOn){
+  if (!pipWin) return;
+  const d = pipWin.document, t = d.getElementById('pipTxt'), dot = d.getElementById('pipDot');
+  if (t) t.textContent = txt;
+  if (dot) dot.classList.toggle('off', !dotOn);
+}
+function updatePip(){
+  if (!pipWin || !rec.active) return;
+  const secs = (recActiveMs() / 1000).toFixed(1);
+  setPipText(rec.paused ? `Paused · ${secs}s` : `REC · ${secs}s`, !rec.paused);
+  const p = pipWin.document.getElementById('pipPause');
+  if (p) p.textContent = rec.paused ? '▶ Resume' : '⏸ Pause';
+}
+function closePip(){ if (pipWin){ try { pipWin.close(); } catch {} pipWin = null; } }
 
 // ---------- Review: crop + trim ----------
 const reviewCanvas = $('#reviewCanvas'), rvCtx = reviewCanvas.getContext('2d');
@@ -1289,10 +1567,9 @@ function setMode(m){
   syncModeUI(m);
   if (m === 'camera'){
     clearTimeout(focusTimer); unfocusView();
-    if (!rv.aspect) rv.aspect = 16/9;
-    applyAspect(rv.aspect);
+    // Keep whatever crop is drawn — it becomes the window; presets and free corner-drags both reshape it.
     pathStatus.textContent = 'Position the window, then record its motion while the clip plays.';
-    drawOutPreview();
+    onCropChange();
   } else {
     unfocusView(true); onCropChange(); scheduleFocus();
   }
@@ -1346,6 +1623,8 @@ function stopPathRec(){
 }
 pathRecBtn.addEventListener('click', () => {
   if (rv.recordingPath){ stopPathRec(); return; }
+  // Lock the window's current shape for the whole path, so resizing mid-path zooms without distortion.
+  rv.aspect = (rv.crop.w * rv.W) / (rv.crop.h * rv.H);
   rv.path = []; rv.recordingPath = true;
   pathRecBtn.classList.add('recording'); pathRecBtn.textContent = '■ Stop path';
   pathStatus.textContent = 'Recording motion… drag / resize the window to follow the action.';
@@ -1406,7 +1685,8 @@ function attachCropDrag(overlay, rectEl, ref, opts){
 }
 attachCropDrag(cropOverlay, cropRect, rv, {
   onChange: onCropChange, onStart: onDragStart, onEnd: onDragEnd,
-  aspect: () => rv.mode === 'camera' ? rv.aspect : null
+  // Free-form resize everywhere; the shape only locks while a camera path is being recorded.
+  aspect: () => (rv.mode === 'camera' && rv.recordingPath) ? rv.aspect : null
 });
 
 // ---------- Live crop guide (non-destructive: full frame is always recorded) ----------
@@ -1447,8 +1727,10 @@ function applyRecording(){
     // Fixed output = the largest window across the path (so the most zoomed-out moment is 1:1); zoomed-in moments upscale.
     const pts = rv.path.length ? rv.path : [rv.crop];
     let maxW = 0; for (const p of pts) maxW = Math.max(maxW, p.w);
+    const ref = pts[0];
+    const aspectPx = (ref.w * rv.W) / (ref.h * rv.H);   // window shape as drawn (free-form or preset)
     outW = Math.max(2, Math.round(maxW * rv.W));
-    outH = Math.max(2, Math.round(outW / rv.aspect));
+    outH = Math.max(2, Math.round(outW / aspectPx));
     const dst = document.createElement('canvas'); dst.width = outW; dst.height = outH;
     const dctx = dst.getContext('2d', { willReadFrequently: true }); dctx.imageSmoothingEnabled = true;
     for (let i = inIdx; i <= outIdx; i++){
@@ -1488,6 +1770,7 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.code === 'Escape'){ e.preventDefault(); cancelRecorder(); }
   else if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); recToggle.click(); }
+  else if (e.code === 'KeyP' && rec.active){ e.preventDefault(); pauseResumeRec(); }
 });
 
 // ---------- Utils ----------
