@@ -28,6 +28,18 @@ node serve.js        # then open http://localhost:4599
 
 > First launch needs internet once to fetch the two libraries ([gifuct-js](https://github.com/matt-way/gifuct-js) + [gifenc](https://github.com/mattdesl/gifenc)); the browser caches them afterward.
 
+## Deploying (Cloudflare + GitHub Actions)
+
+The app is fully static (everything in `public/`), so it deploys as a Cloudflare Worker with static assets. Every push to `master` triggers [.github/workflows/deploy.yml](.github/workflows/deploy.yml), which runs `wrangler deploy`.
+
+One-time setup:
+
+1. In [wrangler.jsonc](wrangler.jsonc), replace `giffer.example.com` with your domain (its zone must already be on Cloudflare).
+2. In the GitHub repo settings → **Secrets and variables → Actions**, add:
+   - `CLOUDFLARE_API_TOKEN` — create at dash.cloudflare.com → My Profile → API Tokens, using the **Edit Cloudflare Workers** template.
+   - `CLOUDFLARE_ACCOUNT_ID` — shown on the right side of any zone's Overview page (or Workers & Pages → Overview).
+3. Push. Wrangler creates the DNS record for the custom domain automatically on first deploy.
+
 ## Tech
 
 Plain HTML/CSS/JS — no build step. GIF decoding via `gifuct-js`, re-encoding via `gifenc`, compositing on `<canvas>`.
