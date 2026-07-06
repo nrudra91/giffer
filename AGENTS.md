@@ -2,15 +2,16 @@
 
 Guidance for AI agents (and humans) making changes to this repo. The same code
 must keep working in **two environments**: run locally via `node serve.js`, and
-deployed to Cloudflare (Workers static assets) via GitHub Actions.
+deployed to Cloudflare (Workers static assets) from a synced fork.
 
 ## Architecture in one paragraph
 
 Giffer is a fully static, client-side app with **no build step**. The entire
 app lives in `public/index.html` (HTML + CSS + JS in one file). `serve.js` is a
 tiny Node static server used only for local development. `wrangler.jsonc`
-deploys `public/` to Cloudflare; `.github/workflows/deploy.yml` runs
-`wrangler deploy` on every push to `master`.
+deploys `public/` to Cloudflare. This repo intentionally has no deploy
+workflow: a fork on another GitHub account syncs from this repo periodically,
+and Cloudflare's git integration (Workers Builds) deploys from that fork.
 
 ## Rules to keep both environments working
 
@@ -55,9 +56,9 @@ deploys `public/` to Cloudflare; `.github/workflows/deploy.yml` runs
 2. Deploy config: `npx wrangler deploy --dry-run` must succeed and its
    "Read N file(s) from the assets directory" output should include any files
    you added.
-3. If you changed `wrangler.jsonc` or the workflow, remember deploys are
-   triggered from GitHub Actions using the `CLOUDFLARE_API_TOKEN` and
-   `CLOUDFLARE_ACCOUNT_ID` repo secrets — never hardcode credentials.
+3. If you changed `wrangler.jsonc`, remember deploys are run by Cloudflare's
+   git integration from the synced fork. Do not add deploy workflows, deploy
+   secrets, or hardcoded credentials to this repo.
 
 ## Things that look wrong but aren't
 
